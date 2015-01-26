@@ -8,3 +8,6 @@
 Debug
 stdafx.*
 targetver.h
+*~
+makefile
+

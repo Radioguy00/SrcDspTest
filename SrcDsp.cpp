@@ -15,9 +15,9 @@
 #include "..\..\SrcLibraries\SrcDsp\generators.h"
 #include "..\..\SrcLibraries\SrcDsp\files.h"
 #else
-#include "..\..\SrcLibraries\SrcDsp\filters.h"
-#include "..\..\SrcLibraries\SrcDsp\generators.h"
-#include "..\..\SrcLibraries\SrcDsp\files.h"
+#include "../../src_libraries/dsp/filters.h"
+#include "../../src_libraries/dsp/generators.h"
+#include "../../src_libraries/dsp/files.h"
 #endif
 
 
