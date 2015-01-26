@@ -1,0 +1,10 @@
+*.txt
+*.bin
+*.opensdf
+*.sdf
+*.sln
+*.suo
+*.vcxproj*
+Debug
+stdafx.*
+targetver.h
