@@ -1,15 +1,25 @@
 // SrcDsp.cpp : Defines the entry point for the console application.
 //
 
+#ifdef _WIN32
 #include "stdafx.h"
+#endif
+
 #include <iostream>
 #include <fstream>
 #include <vector>
 #include <cstdint>
-//#include "D:\SoftApp\SrcLibraries\SrcDsp\filters.h"
+
+#ifdef _WIN32
 #include "..\..\SrcLibraries\SrcDsp\filters.h"
 #include "..\..\SrcLibraries\SrcDsp\generators.h"
 #include "..\..\SrcLibraries\SrcDsp\files.h"
+#else
+#include "..\..\SrcLibraries\SrcDsp\filters.h"
+#include "..\..\SrcLibraries\SrcDsp\generators.h"
+#include "..\..\SrcLibraries\SrcDsp\files.h"
+#endif
+
 
 bool testFilters();
 bool testGenerators();
