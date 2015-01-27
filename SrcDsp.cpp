@@ -15,8 +15,8 @@
 #include "..\..\SrcLibraries\SrcDsp\generators.h"
 #include "..\..\SrcLibraries\SrcDsp\files.h"
 #else
-#include "../../src_libraries/dsp/filters.h"
-#include "../../src_libraries/dsp/generators.h"
+//#include "../../src_libraries/dsp/filters.h"
+//#include "../../src_libraries/dsp/generators.h"
 #include "../../src_libraries/dsp/files.h"
 #endif
 
@@ -24,13 +24,28 @@
 bool testFilters();
 bool testGenerators();
 bool testFiles();
+int common_main();
 
+#ifdef _WIN32
 int _tmain(int argc, _TCHAR* argv[])
+{
+	return common_main();
+}
+#else
+int main(int argc, char ** argv)
+{
+	return common_main();
+}
+
+#endif
+
+int common_main()
 {
 	testFiles();
 
 	return 0;
 }
+
 
 bool testFiles()
 {
@@ -71,6 +86,7 @@ bool testFiles()
 
 }
 
+#if 0
 bool testGenerators()
 {
 	using namespace dsptl;
@@ -170,3 +186,5 @@ bool testFilters()
 
 	return false;
 }
+
+#endif

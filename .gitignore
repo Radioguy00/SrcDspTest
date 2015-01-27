@@ -10,4 +10,5 @@ stdafx.*
 targetver.h
 *~
 makefile
-
+SrcDsp
+obj
