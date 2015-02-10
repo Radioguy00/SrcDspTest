@@ -12,3 +12,4 @@ targetver.h
 makefile
 SrcDsp
 obj
+*.TMP
