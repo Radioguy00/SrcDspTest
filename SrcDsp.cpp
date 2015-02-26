@@ -16,12 +16,14 @@
 #include "..\..\SrcLibraries\SrcDsp\files.h"
 #include "..\..\SrcLibraries\SrcDsp\upsampling_filters.h"
 #include "..\..\SrcLibraries\SrcDsp\modulators.h"
+#include "..\..\SrcLibraries\SrcDsp\correlators.h"
 #else
 #include "../../src_libraries/dsp/filters.h"
 #include "../../src_libraries/dsp/generators.h"
 #include "../../src_libraries/dsp/files.h"
 #include "../../src_libraries/dsp/upsampling_filters.h"
 #include "../../src_libraries/dsp/modulators.h"
+#include "../../src_libraries/dsp/correlators.h"
 #endif
 
 /*-----------------------------------------------------------------------------
@@ -56,6 +58,39 @@ bool testModulatorSdpsk(std::string bitsFile, std::string outFile)
 	return false;
 }
 
+template <class T>
+bool testFixedPatternCorrelator()
+{
+
+	using namespace std;
+	using namespace dsptl;
+	const size_t nbrBits = 100; // Number of bits to run through the modulator
+
+	// Create input vector
+	vector<complex<T> > in(1000);
+	for (int index = 0; index < static_cast<int>(in.size()); ++index)
+		in[index] = complex<int32_t>(8191,-8191);  // Test for 14 bits quantizer
+
+	// Create the correlator object
+	FixedPatternCorrelator<>  corr{};
+
+	//set the correlation pattern
+	array<complex<int32_t>, 32> coeffs;
+	for (size_t index = 0; index < coeffs.size(); ++index)
+		coeffs[index] = complex<int32_t>(4095, -4095); // 14 bits correlation coefficients
+
+	corr.setPattern(coeffs);
+
+	// Run the correlator
+	size_t result;
+	corr.step(in, result);
+	// Save the output file
+	//ofstream osBits(bitsFile);
+	//ofstream osOut(outFile);
+	//saveAsciiSamples(bits, osBits);
+	//saveAsciiSamples(out, osOut);
+	return false;
+}
 
 
 bool testFilters();
@@ -80,6 +115,9 @@ int main(int argc, char ** argv)
 
 int common_main()
 {
+
+	testFixedPatternCorrelator<int16_t>();
+
 	testFiles();
 	testGenerators();
 	testFilters();
