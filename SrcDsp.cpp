@@ -126,7 +126,6 @@ int common_main()
 	testModulatorSdpsk<double>("Input.txt", "Output.txt");
 	testModulatorSdpsk<int16_t>("Input.txt", "Output.txt");
 	testModulatorSdpsk<int32_t>("Input.txt", "Output.txt");
-	testModulatorSdpsk<int8_t>("Input.txt", "Output.txt");
 
 	return 0;
 }
