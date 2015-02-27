@@ -83,7 +83,20 @@ bool testFixedPatternCorrelator()
 
 	// Run the correlator
 	size_t result;
-	corr.step(in, result);
+
+	
+	cout << "\nStarting correlator speed test" << '\n';
+	clock_t t = clock();
+	size_t iterations  = 10000;
+	for(size_t index = 0; index < iterations; index ++)
+		corr.step(in, result);
+	t = clock()- t;
+	cout << "correlator: " << (((double)t) * 1000) / CLOCKS_PER_SEC << " milliseconds" << '\n';
+
+
+
+
+
 	// Save the output file
 	//ofstream osBits(bitsFile);
 	//ofstream osOut(outFile);
@@ -118,14 +131,14 @@ int common_main()
 
 	testFixedPatternCorrelator<int16_t>();
 
-	testFiles();
-	testGenerators();
-	testFilters();
-	testUpsamplingFilters();
-	testModulatorSdpsk<float>("Input.txt", "Output.txt");
-	testModulatorSdpsk<double>("Input.txt", "Output.txt");
-	testModulatorSdpsk<int16_t>("Input.txt", "Output.txt");
-	testModulatorSdpsk<int32_t>("Input.txt", "Output.txt");
+//	testFiles();
+//	testGenerators();
+//	testFilters();
+//	testUpsamplingFilters();
+//	testModulatorSdpsk<float>("Input.txt", "Output.txt");
+//	testModulatorSdpsk<double>("Input.txt", "Output.txt");
+//	testModulatorSdpsk<int16_t>("Input.txt", "Output.txt");
+//	testModulatorSdpsk<int32_t>("Input.txt", "Output.txt");
 
 	return 0;
 }
