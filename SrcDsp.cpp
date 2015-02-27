@@ -87,15 +87,11 @@ bool testFixedPatternCorrelator()
 	
 	cout << "\nStarting correlator speed test" << '\n';
 	clock_t t = clock();
-	size_t iterations  = 10000;
+	size_t iterations  = 100;
 	for(size_t index = 0; index < iterations; index ++)
 		corr.step(in, result);
 	t = clock()- t;
-	cout << "correlator: " << (((double)t) * 1000) / CLOCKS_PER_SEC << " milliseconds" << '\n';
-
-
-
-
+	cout << "correlator: Time per iteration: " << (((double)t) * 1000) / CLOCKS_PER_SEC / iterations << " milliseconds" << '\n';
 
 	// Save the output file
 	//ofstream osBits(bitsFile);
@@ -143,7 +139,7 @@ int common_main()
 	return 0;
 }
 
-
+#if 0
 bool testFiles()
 {
 	using namespace dsptl;
@@ -543,3 +539,5 @@ bool testModulators()
 
 	return false;
 }
+
+#endif
