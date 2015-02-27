@@ -9,6 +9,7 @@
 #include <fstream>
 #include <vector>
 #include <cstdint>
+#include <ctime>
 
 #ifdef _WIN32
 #include "..\..\SrcLibraries\SrcDsp\filters.h"
@@ -139,7 +140,7 @@ int common_main()
 	return 0;
 }
 
-#if 0
+
 bool testFiles()
 {
 	using namespace dsptl;
@@ -540,4 +541,3 @@ bool testModulators()
 	return false;
 }
 
-#endif
