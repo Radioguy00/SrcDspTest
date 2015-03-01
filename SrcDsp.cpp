@@ -16,6 +16,7 @@
 #include "..\..\SrcLibraries\SrcDsp\generators.h"
 #include "..\..\SrcLibraries\SrcDsp\files.h"
 #include "..\..\SrcLibraries\SrcDsp\upsampling_filters.h"
+#include "..\..\SrcLibraries\SrcDsp\dnsampling_filters.h"
 #include "..\..\SrcLibraries\SrcDsp\modulators.h"
 #include "..\..\SrcLibraries\SrcDsp\correlators.h"
 #else
@@ -23,6 +24,7 @@
 #include "../../src_libraries/dsp/generators.h"
 #include "../../src_libraries/dsp/files.h"
 #include "../../src_libraries/dsp/upsampling_filters.h"
+#include "../../src_libraries/dsp/dnsampling_filters.h"
 #include "../../src_libraries/dsp/modulators.h"
 #include "../../src_libraries/dsp/correlators.h"
 #endif
@@ -103,6 +105,114 @@ bool testFixedPatternCorrelator()
 }
 
 
+/*-----------------------------------------------------------------------------
+Test a downsampling filter.
+
+The template parameters mirrors the template parameters available for the 
+filter.
+
+@tparam InType Type of the input signal. Can be float, double, complex, int...
+@tparam OutType Type of the output signal
+@tparam InternalType Type used internally for the computation
+@tparam CoefType Type of the coefficients. Cannot be complex
+@tparam M	Downsampling ratio
+
+It is the responsibility of the caller to make sure that the different types
+work smoothly. Overflow and underflow conditions must not occur
+
+@return false if no error. true if an error occurred
+
+------------------------------------------------------------------------------*/
+template<class InType, class OutType, class InternalType, class CoefType, unsigned M>
+bool testDnsamplingFilter()
+{
+	using namespace dsptl;
+	using namespace std;
+
+	vector<InType> in;
+	vector<OutType> out;
+
+
+	// The following coefficients correspond to:
+	// Lowpass - Fpass = 0.15 - Fstop = 0.4 - Apass = 0.5 - Astop = 50
+	const vector<double> coeffs_double = {
+		-0.01059321924411, -0.02235300003302, -0.02449850003147, 0.001614827776104,
+		0.06449213811506, 0.1507777255143, 0.2269893874909, 0.2574812935042,
+		0.2269893874909, 0.1507777255143, 0.06449213811506, 0.001614827776104,
+		-0.02449850003147, -0.02235300003302, -0.01059321924411
+	};
+
+
+
+	vector<CoefType> coeffs;
+	for (auto it = coeffs_double.cbegin(); it != coeffs_double.cend(); ++it)
+		coeffs.push_back(static_cast<CoefType>((*it) * (INT16_MAX >> 0)));
+
+
+	FilterDnsamplingFir<InType, OutType, InternalType, CoefType, M> filter(coeffs);
+	size_t outLength ;
+
+
+	// Impulse response test
+	// The output should be a decimated version of the coefficients
+	outLength = 500;
+	in.assign(M * outLength, {});
+	in[0] = { 1, 1 };
+	out.assign(outLength, {});
+	filter.reset();
+	filter.step(in, out);
+
+	// History storage test
+	// The internal history buffer should contain the
+	// last N-1 values of the input.
+	outLength = 500;
+	in.assign(M * outLength, {});
+	for (size_t k = 0; k < in.size(); ++k)
+		in[k] = InType(k, k);
+	out.assign(outLength, {});
+	filter.reset();
+	filter.step(in, out);
+
+	// Sinewave test
+	// This test calls the step function of the filter
+	// several times to make sure that the filter history is
+	// handled properly
+	outLength = 500;
+	in.assign(M * outLength, {});
+	out.assign(outLength, {});
+	filter.reset();
+
+
+	string sineFilename{ "filter_dn_input.txt" };
+	string filterOutFilename{ "filter_dn_output.txt" };
+	ofstream osIn(sineFilename);
+	ofstream osOut(filterOutFilename);
+	// vectors to store the results of all iterations
+	vector<InType> inCombined;
+	vector<OutType> outCombined;
+
+	GenSine<InType> gen(0.1, 31000);
+	int nbrLoops = 5;
+	for (int loopIndex = 0; loopIndex < nbrLoops; ++loopIndex)
+	{
+		gen.step(in);
+		filter.step(in, out);
+		inCombined.insert(inCombined.end(), in.cbegin(), in.cend());
+		outCombined.insert(outCombined.end(), out.cbegin(), out.cend());
+
+	}
+
+	saveAsciiSamples(outCombined, osOut);
+	saveAsciiSamples(inCombined, osIn);
+	cout << "Filter input saved in :" << sineFilename << '\n';
+	cout << "Filter output saved in : " << filterOutFilename << '\n';
+
+
+
+	return false;
+}
+
+
 bool testFilters();
 bool testGenerators();
 bool testFiles();
@@ -125,8 +235,12 @@ int main(int argc, char ** argv)
 
 int common_main()
 {
+	using namespace dsptl;
+	using namespace std;
 
-	testFixedPatternCorrelator<int16_t>();
+	testDnsamplingFilter<complex<int16_t>, complex<int16_t>, complex<int32_t>, int32_t, 2>();
+
+//	testFixedPatternCorrelator<int16_t>();
 
 //	testFiles();
 //	testGenerators();
