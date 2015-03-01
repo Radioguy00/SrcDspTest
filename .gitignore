@@ -9,7 +9,6 @@ Debug
 stdafx.*
 targetver.h
 *~
-makefile
 SrcDsp
 obj
 *.TMP
