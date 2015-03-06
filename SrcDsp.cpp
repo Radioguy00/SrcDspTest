@@ -10,6 +10,8 @@
 #include <vector>
 #include <cstdint>
 #include <ctime>
+#include "coefficients.h"
+
 
 #ifdef _WIN32
 #include "..\..\SrcLibraries\SrcDsp\filters.h"
@@ -19,6 +21,7 @@
 #include "..\..\SrcLibraries\SrcDsp\dnsampling_filters.h"
 #include "..\..\SrcLibraries\SrcDsp\modulators.h"
 #include "..\..\SrcLibraries\SrcDsp\correlators.h"
+#include "..\..\SrcLibraries\SrcDsp\mixers.h"
 #else
 #include "../../src_libraries/dsp/filters.h"
 #include "../../src_libraries/dsp/generators.h"
@@ -27,6 +30,7 @@
 #include "../../src_libraries/dsp/dnsampling_filters.h"
 #include "../../src_libraries/dsp/modulators.h"
 #include "../../src_libraries/dsp/correlators.h"
+#include "../../src_libraries/dsp/mixers.h"
 #endif
 
 /*-----------------------------------------------------------------------------
@@ -61,6 +65,15 @@ bool testModulatorSdpsk(std::string bitsFile, std::string outFile)
 	return false;
 }
 
+
+/*-----------------------------------------------------------------------------
+Test the fixed pattern correlator
+
+@arg The first test checks the dynamic range as well as the speed of the correlator
+@arg The second test checks the correlator against canned waveform
+
+------------------------------------------------------------------------------*/
+
 template <class T>
 bool testFixedPatternCorrelator()
 {
@@ -69,38 +82,255 @@ bool testFixedPatternCorrelator()
 	using namespace dsptl;
 	const size_t nbrBits = 100; // Number of bits to run through the modulator
 
-	// Create input vector
-	vector<complex<T> > in(1000);
-	for (int index = 0; index < static_cast<int>(in.size()); ++index)
-		in[index] = complex<int32_t>(8191,-8191);  // Test for 14 bits quantizer
+	//---------- Checks dynamic range as well as speed of the computation
+	{
+		// Create input vector
+		vector<complex<T> > in(1000);
+		for (int index = 0; index < static_cast<int>(in.size()); ++index)
+			in[index] = complex<int32_t>(index, -index);  // Test for 14 bits quantizer
 
-	// Create the correlator object
-	FixedPatternCorrelator<>  corr{};
+		// Create the correlator object
+		FixedPatternCorrelator<>  corr{};
 
-	//set the correlation pattern
-	array<complex<int32_t>, 32> coeffs;
-	for (size_t index = 0; index < coeffs.size(); ++index)
-		coeffs[index] = complex<int32_t>(4095, -4095); // 14 bits correlation coefficients
+		//set the correlation pattern
+		array<complex<int32_t>, 32> coeffs;
+		for (size_t index = 0; index < coeffs.size(); ++index)
+			coeffs[index] = complex<int32_t>(4000+ index+1, 0); // 14 bits correlation coefficients
 
-	corr.setPattern(coeffs);
+		corr.setPattern(coeffs);
 
-	// Run the correlator
-	size_t result;
+		// Run the correlator
+		int corrIndex;
 
-	
-	cout << "\nStarting correlator speed test" << '\n';
-	clock_t t = clock();
-	size_t iterations  = 100;
-	for(size_t index = 0; index < iterations; index ++)
-		corr.step(in, result);
-	t = clock()- t;
-	cout << "correlator: Time per iteration: " << (((double)t) * 1000) / CLOCKS_PER_SEC / iterations << " milliseconds" << '\n';
 
-	// Save the output file
-	//ofstream osBits(bitsFile);
-	//ofstream osOut(outFile);
-	//saveAsciiSamples(bits, osBits);
-	//saveAsciiSamples(out, osOut);
+		cout << "\nStarting correlator speed test" << '\n';
+		clock_t t = clock();
+		int iterations = 100;
+		for (int index = 0; index < iterations; index++)
+			corr.step(in, corrIndex);
+		t = clock() - t;
+		cout << "correlator: Time per iteration: " << (((double)t) * 1000) / CLOCKS_PER_SEC / iterations << " milliseconds" << '\n';
+	}
+	//-----------------------------------------------------------------------
+	//---------- Checks the correlator against a canned waveform
+	//-----------------------------------------------------------------------
+	{
+
+		// Set the correlator coefficients
+		// The file used to read the coefficients is a formatted file where each 
+		// value is a double.
+		// 0.61825828 -0.50000000
+		// 0.87399734 - 0.61825828
+		// 0.61825828 0.12092214
+		// - 0.15550441 0.61825828
+
+		const int corrSize = 32;
+		string corrFile{ "DnlSyncOqpsk.dat" };
+		ifstream iscorr{ corrFile };
+		if (!iscorr)
+		{
+			cout << "\nCannot open correlator coefficient file " << corrFile << endl;
+			exit(1);
+		}
+		vector<double> corrCoeffsDouble;
+		copy(istream_iterator<double>(iscorr), istream_iterator<double >(), back_inserter(corrCoeffsDouble));
+		assert(corrCoeffsDouble.size() == corrSize * 2);
+		array<complex<int32_t>, corrSize> corrCoeffs;
+		const int corrCoeffsScaleFactor = (INT16_MAX >> 3);
+		for (int k = 0; k < corrSize; ++k)
+		{
+			int32_t a = static_cast<int32_t>(corrCoeffsDouble[2 * k] * corrCoeffsScaleFactor);
+			int32_t b = static_cast<int32_t>(corrCoeffsDouble[2 * k + 1] * corrCoeffsScaleFactor);
+			corrCoeffs[k] = { a, b };
+		}
+
+		// Create the correlator object
+
+		FixedPatternCorrelator<>  corr{};
+		corr.setPattern(corrCoeffs);
+
+
+		// Prepare the input file
+		// The file contains unformatted, interleaved signed 16 bits I,Q samples
+		// The sampling rate is 38400 sps
+		string inFile{ "nts_baseband_1.dat" };
+		ifstream isinfile{ inFile, ios::in | ios::binary };
+		if (!isinfile)
+		{
+			cout << "\nCannot open baseband samples file " << inFile << endl;
+			exit(1);
+		}
+
+		// Read the file block by block and perform the correlation
+		int corrIndex = 0;
+		const int blockSize = 1024;
+		vector<complex<int16_t>> inSamples(blockSize);
+		char * ptr = reinterpret_cast<char *>(&inSamples[0]);
+		while (isinfile.good())
+		{
+			isinfile.read(ptr, blockSize * sizeof(complex<int16_t>));
+			// Note: the last block may have been filled only partially
+			// so the last elements may be garbage. This is OK
+
+			// For testing purposes, the inputs are scaled by 2 to see if we saturate somewhere
+			int scale = 0;
+			for (size_t index = 0; index < inSamples.size(); ++index)
+			{
+				inSamples[index] = complex<int16_t>(inSamples[index].real() >> scale, inSamples[index].imag() >> scale);
+
+			}
+
+			bool result = corr.step(inSamples, corrIndex);
+			if (result)
+			{
+				cout << "\nCorrelation found at : " << corrIndex;
+			}
+			
+		}
+
+
+		// Save the output file
+		//ofstream osBits(bitsFile);
+		//ofstream osOut(outFile);
+		//saveAsciiSamples(bits, osBits);
+		//saveAsciiSamples(out, osOut);
+	}
+	return false;
+}
+
+template <class InType, class OutType, class InternalType, class CoefType = int32_t>
+bool testFilters()
+{
+	using namespace std;
+	using namespace dsptl;
+
+	// Impulse response test
+	{
+		// Impulse response test
+		cout << "Creation of filter object" << '\n';
+		vector<CoefType> filterCoeff{ 134 , 309, 768};
+		FilterFir<InType, OutType, InternalType, CoefType> filter(filterCoeff);
+
+		cout << "Filter inpulse response" << '\n';
+		vector<InType> input{ 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+		vector<OutType> output(input.size());
+		filter.step(input, output);
+
+		for (size_t index = 0; index < output.size(); ++index)
+			cout << output[index] << " ";
+
+		cout << '\n';
+
+		cout << "Delayed Filter inpulse response" << '\n';
+		input = { 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0 };
+		output.resize(input.size());
+		filter.step(input, output);
+
+
+		for (size_t index = 0; index < output.size(); ++index)
+			cout << output[index] << " ";
+		cout << '\n';
+	}
+
+	// Sinewave Test
+	{
+		// Create input and output vectors
+		int outLength = 500;
+		vector<InType> in(outLength);
+		vector<OutType> out(outLength);
+
+
+
+		// Create the vector for the coefficients
+		vector<int32_t> coeffs;
+		for (size_t index = 0; index < coeffsRrc.size(); ++index)
+		{
+			coeffs.push_back(static_cast<int32_t>(coeffsRrc[index] * (INT16_MAX >> 0)));
+		}
+		// Create filter object
+		FilterFir<InType, OutType, InternalType, CoefType> filter(coeffs);
+
+		// Create debugging vectors and files 
+
+		string sineFilename{ "filter_input.txt" };
+		string filterOutFilename{ "filter_output.txt" };
+		ofstream osIn(sineFilename);
+		ofstream osOut(filterOutFilename);
+		// vectors to store the results of all iterations
+		vector<InType> inCombined;
+		vector<OutType> outCombined;
+		filter.reset();
+		GenSine<InType> gen(0.1, 32000);
+		int nbrLoops = 5;
+		for (int loopIndex = 0; loopIndex < nbrLoops; ++loopIndex)
+		{
+			gen.step(in);
+			filter.step(in, out);
+			inCombined.insert(inCombined.end(), in.cbegin(), in.cend());
+			outCombined.insert(outCombined.end(), out.cbegin(), out.cend());
+
+		}
+
+		saveAsciiSamples(outCombined, osOut);
+		saveAsciiSamples(inCombined, osIn);
+		cout << "Filter input saved in :" << sineFilename << '\n';
+		cout << "Filter output saved in : " << filterOutFilename << '\n';
+
+	}
+
+
+
+	return false;
+}
+
+
+template < class InType, class OutType, class PhaseType, unsigned N = 4096 >
+bool testMixers()
+{
+	using namespace std;
+	using namespace dsptl;
+
+	// Sinewave Test
+	{
+		// Create input and output vectors
+		int outLength = 500;
+		vector<InType> in(outLength);
+		vector<OutType> out(outLength);
+
+		// Create mixer object
+		Mixer< InType,OutType,PhaseType, N > mixer;
+
+		// Create debugging vectors and files 
+
+		string sineFilename{ "mixer_input.txt" };
+		string filterOutFilename{ "mixer_output.txt" };
+		ofstream osIn(sineFilename);
+		ofstream osOut(filterOutFilename);
+		// vectors to store the results of all iterations
+		vector<InType> inCombined;
+		vector<OutType> outCombined;
+		mixer.reset();
+		mixer.setFrequency(0.05);
+		GenSine<InType> gen(0.05, 32000);
+		int nbrLoops = 5;
+		for (int loopIndex = 0; loopIndex < nbrLoops; ++loopIndex)
+		{
+			gen.step(in);
+			mixer.step(in, out);
+			inCombined.insert(inCombined.end(), in.cbegin(), in.cend());
+			outCombined.insert(outCombined.end(), out.cbegin(), out.cend());
+
+		}
+
+		saveAsciiSamples(outCombined, osOut);
+		saveAsciiSamples(inCombined, osIn);
+		cout << "Mixer input saved in :" << sineFilename << '\n';
+		cout << "Mixer output saved in : " << filterOutFilename << '\n';
+
+	}
+
+
+
 	return false;
 }
 
@@ -217,7 +447,6 @@ bool testFilters();
 bool testGenerators();
 bool testFiles();
 bool testUpsamplingFilters();
-bool testModulators();
 int common_main();
 
 #ifdef _WIN32
@@ -238,14 +467,15 @@ int common_main()
 	using namespace dsptl;
 	using namespace std;
 
-	testDnsamplingFilter<complex<int16_t>, complex<int16_t>, complex<int32_t>, int32_t, 2>();
+//	testDnsamplingFilter<complex<int16_t>, complex<int16_t>, complex<int32_t>, int32_t, 2>();
 
 //	testFixedPatternCorrelator<int16_t>();
 
 //	testFiles();
 //	testGenerators();
-//	testFilters();
-//	testUpsamplingFilters();
+//	testFilters<complex<int16_t>, complex<int16_t>, complex<int32_t>, int32_t>();
+	testMixers<std::complex<int16_t>, std::complex<int16_t>, int16_t, 4096 >();
+	//	testUpsamplingFilters();
 //	testModulatorSdpsk<float>("Input.txt", "Output.txt");
 //	testModulatorSdpsk<double>("Input.txt", "Output.txt");
 //	testModulatorSdpsk<int16_t>("Input.txt", "Output.txt");
@@ -569,89 +799,4 @@ bool testUpsamplingFilters()
 	return false;
 }
 
-bool testFilters()
-{
-	using namespace std;
-
-	cout << "Program is starting" << '\n';
-	cout << "Floating point test" << '\n';
-
-	{
-		cout << "Creation of filter object" << '\n';
-		vector<float> filterCoeff{ 1.34f, 4.56f, 0.34f };
-		FilterFir<float, double, double, float> filter(filterCoeff);
-
-		cout << "Filter inpulse response" << '\n';
-		vector<float> input{ 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-		vector<double> output(input.size());
-		filter.step(input, output);
-#ifdef CPLUSPLUS11
-		for (const auto& elt : output)
-			cout << elt << " ";
-#else
-		for (size_t index = 0; index< output.size(); ++index)
-			cout << output[index] << " ";
-#endif
-		cout << '\n';
-
-		cout << "Delayed Filter inpulse response" << '\n';
-		input = { 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0 };
-		output.resize(input.size());
-		filter.step(input, output);
-
-#ifdef CPLUSPLUS11
-		for (const auto& elt : output)
-			cout << elt << " ";
-#else
-		for (size_t index = 0; index< output.size(); ++index)
-			cout << output[index] << " ";
-#endif
-		cout << '\n';
-	}
-
-	cout << '\n' << "Integer test" << '\n';
-	{
-		cout << "Creation of filter object" << '\n';
-		vector<int16_t> filterCoeff{ 234, -23, 12 };
-		FilterFir<int16_t, int32_t, int32_t, int16_t> filter(filterCoeff);
-
-		cout << "Filter inpulse response" << '\n';
-		vector<int16_t> input{ 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-		vector<int32_t> output(input.size());
-		filter.step(input, output);
-
-#ifdef CPLUSPLUS11
-		for (const auto& elt : output)
-			cout << elt << " ";
-#else
-		for (size_t index = 0; index< output.size(); ++index)
-			cout << output[index] << " ";
-#endif
-
-		cout << '\n' << "Delayed Filter inpulse response" << '\n';
-		input = { 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0 };
-		output.resize(input.size());
-		filter.step(input, output);
-
-#ifdef CPLUSPLUS11
-		for (const auto& elt : output)
-			cout << elt << " ";
-#else
-		for (size_t index = 0; index< output.size(); ++index)
-			cout << output[index] << " ";
-#endif
-		cout << '\n';
-	}
-
-	return false;
-}
-
-
-bool testModulators()
-{
-
-
-
-	return false;
-}
 
