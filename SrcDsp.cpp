@@ -10,6 +10,7 @@
 #include <vector>
 #include <cstdint>
 #include <ctime>
+#include <iterator>
 #include "coefficients.h"
 
 
@@ -473,8 +474,8 @@ int common_main()
 
 //	testFiles();
 //	testGenerators();
-//	testFilters<complex<int16_t>, complex<int16_t>, complex<int32_t>, int32_t>();
-	testMixers<std::complex<int16_t>, std::complex<int16_t>, int16_t, 4096 >();
+	testFilters<complex<int16_t>, complex<int16_t>, complex<int32_t>, int32_t>();
+	//testMixers<std::complex<int16_t>, std::complex<int16_t>, int16_t, 4096 >();
 	//	testUpsamplingFilters();
 //	testModulatorSdpsk<float>("Input.txt", "Output.txt");
 //	testModulatorSdpsk<double>("Input.txt", "Output.txt");
