@@ -23,6 +23,7 @@
 #include "..\..\SrcLibraries\SrcDsp\modulators.h"
 #include "..\..\SrcLibraries\SrcDsp\correlators.h"
 #include "..\..\SrcLibraries\SrcDsp\mixers.h"
+#include "..\..\SrcLibraries\SrcDsp\demodulators.h"
 #else
 #include "../../src_libraries/dsp/filters.h"
 #include "../../src_libraries/dsp/generators.h"
@@ -32,6 +33,7 @@
 #include "../../src_libraries/dsp/modulators.h"
 #include "../../src_libraries/dsp/correlators.h"
 #include "../../src_libraries/dsp/mixers.h"
+#include "../../src_libraries/dsp/demodulators.h"
 #endif
 
 /*-----------------------------------------------------------------------------
