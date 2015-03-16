@@ -445,6 +445,147 @@ bool testDnsamplingFilter()
 	return false;
 }
 
+/*-----------------------------------------------------------------------------
+This routine test the OQPSKdemodulator by comparing the behavior of the routine
+versus its matlab representation. \n
+
+Three files are used :
+@arg DemodulatorRefData: bit samples of the sync word with modulation removed.
+@arg DemodulatorInputData.dat: Input of the demodulator exactly as Matlab sees it
+@arg DemodulatorSoftbits.dat: Softbits output of the Matlab demdulator for a complete frame
+
+As the rounding in Matlab may be slightly different than in C++, the softbbits may differ by
+1 or 2. In addtion, Matlab softbits may exceed 127 and -128 while the C++ softbits saturate at 127 and -128\n
+
+All the matlab data was created with an initial frequency offset of 0\n
+
+The resulting error count should be zero
+
+@return false if no error. true if an error occurred
+
+------------------------------------------------------------------------------*/
+bool testDemodulatorOqpsk()
+{
+	using namespace std;
+	cout << "DemodulatorOqpsk Test" << '\n';
+	const int syncSize = 32;
+
+	// Create demodulator object
+	dsptl::DemodulatorOqpsk<int16_t> demod;
+	// Bit sync pattern
+	vector<int8_t> bitSyncPattern = { 1,0,1,1,0,0,1,1,1,0,0,1,1,0,0,0,1,0,0,1,1,0,1,1,0,0,1,0,0,0,1,1 };
+	assert(bitSyncPattern.size() == 32);
+	demod.setSyncPattern(bitSyncPattern);
+	// Initial frequency and phase of the loop
+	demod.setInitialFrequency(0);
+	demod.setInitialPhase(0);
+
+
+	// -----  Read the reference vector from a file
+
+	// Read the samples corresponding to the reference from  a file
+	// the format is formatted I Q <RC> where I and Q are integers
+	string refFile{ "DemodulatorRefData.txt" };
+	ifstream isref{ refFile };
+	if (!isref)
+	{
+		cout << "\nCannot open demodulator reference file " << refFile << endl;
+		exit(1);
+	}
+
+	vector<int16_t> tmpVector;
+	// Copy first the whole file content as a sequence of integers
+	copy(istream_iterator<int16_t>(isref), istream_iterator<int16_t >(), back_inserter(tmpVector));
+	assert(tmpVector.size() == syncSize * 2);
+	// Reorganize the data as a vector of complex
+	vector<complex<int16_t> > refVector;
+	const int refVectorScaleFactor = 0;
+	for (int k = 0; k < syncSize ; ++k)
+	{
+		refVector.push_back(complex<int16_t>(tmpVector[2 * k] >> refVectorScaleFactor, tmpVector[2 * k + 1] >> refVectorScaleFactor));
+	}
+	assert(refVector.size() == syncSize);
+	demod.setReference(refVector);
+	demod.reset();
+
+	// -----  Prepare the input file
+
+	// Prepare the input file
+	// The file contains unformatted, interleaved signed 16 bits I,Q samples
+	// there is one sample per bit.
+	string inFile{ "DemodulatorInputData.dat" };
+	ifstream isinfile{ inFile, ios::in | ios::binary };
+	if (!isinfile)
+	{
+		cout << "\nCannot open demodulator input file " << inFile << endl;
+		exit(1);
+	}
+
+
+	// -----  Perform iteration through the whole file content
+
+
+	// Read the file block by block and perform the demodulation
+	vector<int8_t> allBits;
+	const int blockSize = 256;
+	vector<complex<int16_t>> inSamples(blockSize);
+	char * ptr = reinterpret_cast<char *>(&inSamples[0]);
+	int32_t error;
+	while (isinfile.good())
+	{
+		isinfile.read(ptr, blockSize * sizeof(complex<int16_t>));
+		// Note: the last block may have been filled only partially
+		// so the last elements may be garbage. This is OK
+		vector<int8_t> out = demod.step(inSamples, error);
+		// Append the temporary results to the previous results
+		allBits.insert(allBits.end(), out.begin(), out.end());
+
+	}
+
+
+	// -----  Compare the result with the expected result
+
+	// Read the softbits resulting from the result of the processing of
+	// the first frame of the matlab demodulator
+	string softbitsFile{ "DemodulatorOutputSoftbits1.txt" };
+	ifstream issoftbits{ softbitsFile };
+	if (!issoftbits)
+	{
+		cout << "\nCannot open softbits file " << softbitsFile << endl;
+		exit(1);
+	}
+
+	vector<int16_t> matlabSoftbits;
+	// Copy first the whole file content as a sequence of integers
+	copy(istream_iterator<int16_t>(issoftbits), istream_iterator<int16_t >(), back_inserter(matlabSoftbits));
+	assert(matlabSoftbits.size() == 9600 - 32);
+
+	// For each softbits in the matlab file, we compare with the softbit
+	// recovered by the C code.
+	assert(allBits.size() >= matlabSoftbits.size());
+	int errorCount = 0;
+	for (size_t index = 0; index < matlabSoftbits.size(); ++index)
+	{
+		if (abs(matlabSoftbits[index] - allBits[index]) > 3)
+		{
+			// Potential for error. However we check if the matlab
+			// was exceeding the 8 bits value
+			if (matlabSoftbits[index] > 127 && allBits[index] == 127)
+				continue;
+			else if (matlabSoftbits[index] < -128 && allBits[index] == -128)
+				continue;
+			++errorCount;
+			cout << "Matlab: " << matlabSoftbits[index] << "  C++ : " << static_cast<int16_t>(allBits[index]) << '\n';
+		}
+	}
+	cout << "Error Count: " << errorCount << '\n';
+
+
+
+
+	return errorCount == 0;
+}
+
 
 bool testFilters();
 bool testGenerators();
@@ -476,6 +617,7 @@ int common_main()
 
 //	testFiles();
 //	testGenerators();
+	//testDemodulatorOqpsk();
 	testFilters<complex<int16_t>, complex<int16_t>, complex<int32_t>, int32_t>();
 	//testMixers<std::complex<int16_t>, std::complex<int16_t>, int16_t, 4096 >();
 	//	testUpsamplingFilters();
