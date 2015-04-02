@@ -12,6 +12,7 @@
 #include <ctime>
 #include <iterator>
 #include "coefficients.h"
+#include <random>
 
 
 #ifdef _WIN32
@@ -37,8 +38,8 @@
 #endif
 
 /*-----------------------------------------------------------------------------
-Test ModulatorSdpsk<T>
-@tparam T Type of the output of the modulator
+Test SymbolMappingSdpsk<T>
+@tparam T The output of the modulator is complex<T>
 
 @param bitsFile File in which the bits used to modulate the waveform are stored
 @param outFile File in which the output of the modulator is stored
@@ -46,7 +47,7 @@ Test ModulatorSdpsk<T>
 
 ------------------------------------------------------------------------------*/
 template<class T>
-bool testModulatorSdpsk(std::string bitsFile, std::string outFile)
+bool testSymbolMapperSdpsk()
 {
 	using namespace std;
 	using namespace dsptl;
@@ -54,15 +55,57 @@ bool testModulatorSdpsk(std::string bitsFile, std::string outFile)
 
 	// Create the bit pattern
 	vector<int8_t> bits(nbrBits);
+	std::default_random_engine dre;
+	std::uniform_int_distribution<int> di(0, 1);
+	for (size_t index = 0; index < bits.size(); ++index)
+		bits[index] = static_cast<int8_t>(di(dre));
 	// Create the modulator object
-	ModulatorSdpsk<T> mod{};
+	SymbolMapperSdpsk<T> mod{};
 	// Create the ouput of the modulator
 	vector<complex<T> > out(bits.size());
 	// Run the modulator
 	mod.step(bits, out);
 	// Save the output file
-	ofstream osBits(bitsFile);
-	ofstream osOut(outFile);
+	ofstream osBits("sdpsk_mapper_input.txt");
+	ofstream osOut("sdsk_mapper_output.txt");
+	saveAsciiSamples(bits, osBits);
+	saveAsciiSamples(out, osOut);
+	return false;
+}
+
+
+/*-----------------------------------------------------------------------------
+Test SymbolMappingSdpsk<T>
+@tparam T The output of the modulator is complex<T>
+
+@param bitsFile File in which the bits used to modulate the waveform are stored
+@param outFile File in which the output of the modulator is stored
+
+
+------------------------------------------------------------------------------*/
+template<class T>
+bool testSymbolMapperQpsk()
+{
+	using namespace std;
+	using namespace dsptl;
+	const size_t nbrBits = 100; // Number of bits to run through the symbol mapper
+	assert(nbrBits % 2 == 0);
+
+	// Create the bit pattern
+	vector<int8_t> bits(nbrBits);
+	std::default_random_engine dre;
+	std::uniform_int_distribution<int> di(0, 1);
+	for (size_t index = 0; index < bits.size(); ++index)
+		bits[index] = static_cast<int8_t>(di(dre));
+	// Create the modulator object
+	SymbolMapperQpsk<T> mapper{};
+	// Create the ouput of the modulator
+	vector<complex<T> > out(bits.size() / 2);
+	// Run the modulator
+	mapper.step(bits, out);
+	// Save the output file
+	ofstream osBits("qpsk_mapper_input.txt");
+	ofstream osOut("qpsk_mapper_output.txt");
 	saveAsciiSamples(bits, osBits);
 	saveAsciiSamples(out, osOut);
 	return false;
@@ -313,7 +356,7 @@ bool testMixers()
 		vector<InType> inCombined;
 		vector<OutType> outCombined;
 		mixer.reset();
-		mixer.setFrequency(0.05);
+		mixer.setFrequency(0.9f);
 		GenSine<InType> gen(0.05, 32000);
 		int nbrLoops = 5;
 		for (int loopIndex = 0; loopIndex < nbrLoops; ++loopIndex)
@@ -424,7 +467,7 @@ bool testDnsamplingFilter()
 	vector<InType> inCombined;
 	vector<OutType> outCombined;
 
-	GenSine<InType> gen(0.1, 31000);
+	GenSine<InType> gen(0.1, 150);
 	int nbrLoops = 5;
 	for (int loopIndex = 0; loopIndex < nbrLoops; ++loopIndex)
 	{
@@ -612,19 +655,21 @@ int common_main()
 	using namespace std;
 
 //	testDnsamplingFilter<complex<int16_t>, complex<int16_t>, complex<int32_t>, int32_t, 2>();
+	//testSymbolMapperQpsk<int16_t>();
 
 //	testFixedPatternCorrelator<int16_t>();
 
 //	testFiles();
 //	testGenerators();
 	//testDemodulatorOqpsk();
-	testFilters<complex<int16_t>, complex<int16_t>, complex<int32_t>, int32_t>();
+	//testFilters<complex<int16_t>, complex<int16_t>, complex<int32_t>, int32_t>();
 	//testMixers<std::complex<int16_t>, std::complex<int16_t>, int16_t, 4096 >();
 	//	testUpsamplingFilters();
-//	testModulatorSdpsk<float>("Input.txt", "Output.txt");
-//	testModulatorSdpsk<double>("Input.txt", "Output.txt");
-//	testModulatorSdpsk<int16_t>("Input.txt", "Output.txt");
-//	testModulatorSdpsk<int32_t>("Input.txt", "Output.txt");
+
+//	testSymbolMapperSdpsk<float>();
+//	testSymbolMapperSdpsk<double>();
+	testSymbolMapperSdpsk<int16_t>();
+//	testSymbolMapperSdpsk<int32_t>();
 
 	return 0;
 }
