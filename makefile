@@ -37,7 +37,7 @@ _OBJ = SrcDsp.o
 OBJ = $(patsubst %, $(OBJDIR)/%, $(_OBJ))
 
 
-_DSP_OBJ = dsp_complex.o 
+_DSP_OBJ = dsp_complex.o demodulators.o
 DSP_OBJ = $(patsubst %, $(DSP_DIR)/%, $(_DSP_OBJ))
 
 $(OBJDIR)/%.o : %.cpp $(DEPS) 
