@@ -12,7 +12,7 @@ Defintion of filter coefficients, correlator coefficients and other tables.
 
 
 /*-----------------------------------------------------------------------------
-Root Raised cosine filter used for the filter matching
+Root Raised cosine filter used for the receiver filter matching
 
 The parameters are:
 @arg Sampling frequency 38400 sps
