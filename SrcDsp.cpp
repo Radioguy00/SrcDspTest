@@ -628,7 +628,7 @@ bool testUpsamplingFilters()
 	vector<CoefType> filterCoeff;
 	for (auto it = filterCoeffDouble.cbegin(); it != filterCoeffDouble.cend(); ++it)
 	{
-		filterCoeff.push_back(static_cast<CoefType>(*it * numeric_limits<InType::value_type>::max()));
+		filterCoeff.push_back(static_cast<CoefType>(*it * numeric_limits<typename InType::value_type>::max()));
 	}
 
 
@@ -653,7 +653,7 @@ bool testUpsamplingFilters()
 	vector<OutType > out;
 	out.resize(in.size() * L);
 	// Objects creation
-	GenSine<InType> gen(0.1, numeric_limits<InType::value_type>::max());
+	GenSine<InType> gen(0.1, numeric_limits<typename InType::value_type>::max());
 	FilterUpsamplingFir<InType, OutType, InternalType, CoefType, L> filter(filterCoeff);
 	filter.reset();
 
