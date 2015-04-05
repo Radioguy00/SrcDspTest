@@ -628,6 +628,7 @@ bool testUpsamplingFilters()
 	vector<CoefType> filterCoeff;
 	for (auto it = filterCoeffDouble.cbegin(); it != filterCoeffDouble.cend(); ++it)
 	{
+		// filter coefficients are scaled by the size of the input type
 		filterCoeff.push_back(static_cast<CoefType>(*it * numeric_limits<typename InType::value_type>::max()));
 	}
 
